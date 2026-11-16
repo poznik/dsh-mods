@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Session cost and DeepSeek balance",
+    "description": "Shows the estimated cost of the current session as a button below the message composer. Clicking it opens a window with your DeepSeek account balance, read live from the account API, plus the session's token breakdown."
+  }
+}

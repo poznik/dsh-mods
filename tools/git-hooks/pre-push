@@ -1,0 +1,43 @@
+#!/bin/sh
+# Blocks a push whose code changes leave project memory behind.
+#
+# Rules and the bypass are described in AGENTS.md, "Память при пуше". The actual
+# comparison lives in tools/check-memory.sh so the GitHub workflow runs exactly the
+# same logic.
+set -u
+
+if [ "${SKIP_MEMORY_CHECK:-0}" = "1" ]; then
+  echo "pre-push: memory check skipped (SKIP_MEMORY_CHECK=1)"
+  exit 0
+fi
+
+zero=0000000000000000000000000000000000000000
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+check="$script_dir/../check-memory.sh"
+
+status=0
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  # Deleting a remote branch pushes nothing to check.
+  [ "$local_sha" = "$zero" ] && continue
+
+  if [ "$remote_sha" = "$zero" ]; then
+    # A new remote branch: compare against the current default branch when known.
+    base=$(git rev-parse --verify --quiet refs/remotes/origin/main || true)
+  else
+    base=$remote_sha
+  fi
+
+  if ! sh "$check" "$base" "$local_sha"; then
+    status=1
+  fi
+done
+
+if [ "$status" -ne 0 ]; then
+  echo ""
+  echo "pre-push: push blocked — update project memory in the same push."
+  echo "  see AGENTS.md, section «Память при пуше»."
+  echo "  one-off bypass: SKIP_MEMORY_CHECK=1 git push   (or: git push --no-verify)"
+  exit 1
+fi
+
+exit 0

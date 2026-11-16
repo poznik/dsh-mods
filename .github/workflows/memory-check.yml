@@ -1,0 +1,36 @@
+name: memory-check
+
+# Enforces the same rule as the local pre-push hook, so a push from a clone
+# without hooks enabled still shows a failing status: project memory must change
+# together with the code it describes. See AGENTS.md, "Память при пуше".
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  memory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve the comparison base
+        id: base
+        env:
+          EVENT: ${{ github.event_name }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT" = "pull_request" ]; then
+            echo "sha=$PR_BASE" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=$PUSH_BEFORE" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Memory follows code
+        env:
+          BASE: ${{ steps.base.outputs.sha }}
+          HEAD: ${{ github.sha }}
+        run: bash tools/check-memory.sh "$BASE" "$HEAD"
